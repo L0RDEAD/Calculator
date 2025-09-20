@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Полноэкранный Калькулятор</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .calculator {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 0;
+            padding: 0;
+            box-shadow: none;
+            border: none;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .display {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: flex-end;
+            overflow: hidden;
+            min-height: 40vh;
+        }
+        
+        .previous-operand {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 3rem;
+            margin-bottom: 10px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 100%;
+            text-align: right;
+            max-width: 100vw;
+        }
+        
+        .current-operand {
+            color: white;
+            font-size: 5rem;
+            font-weight: bold;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            width: 100%;
+            text-align: right;
+            max-width: 100vw;
+            line-height: 1.2;
+        }
+        
+        .buttons-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            flex: 2;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        button {
+            border: none;
+            padding: 0;
+            font-size: 2.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+            backdrop-filter: blur(5px);
+            border: none;
+            min-height: 80px;
+        }
+        
+        button:active {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(0.98);
+        }
+        
+        .operator {
+            background: rgba(255, 165, 0, 0.2);
+        }
+        
+        .operator:active {
+            background: rgba(255, 165, 0, 0.4);
+        }
+        
+        .equals {
+            background: rgba(46, 204, 113, 0.2);
+        }
+        
+        .equals:active {
+            background: rgba(46, 204, 113, 0.4);
+        }
+        
+        .clear {
+            background: rgba(231, 76, 60, 0.2);
+        }
+        
+        .clear:active {
+            background: rgba(231, 76, 60, 0.4);
+        }
+        
+        .zero {
+            grid-column: span 2;
+        }
+        
+        /* Анимация нажатия для мгновенного отклика */
+        button {
+            transform: translateZ(0);
+            will-change: transform, background;
+        }
+        
+        /* Убираем любые задержки */
+        * {
+            touch-action: manipulation;
+        }
+        
+        /* Адаптивность для очень больших чисел */
+        .current-operand {
+            font-size: min(5rem, 10vw);
+            word-break: break-all;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+        
+        .previous-operand {
+            font-size: min(3rem, 6vw);
+            word-break: break-all;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <div class="display">
+            <div class="previous-operand"></div>
+            <div class="current-operand">0</div>
+        </div>
+        <div class="buttons-grid">
+            <button class="clear" data-action="clear">C</button>
+            <button data-action="backspace">⌫</button>
+            <button class="operator" data-action="÷">÷</button>
+            <button class="operator" data-action="×">×</button>
+            
+            <button data-number="7">7</button>
+            <button data-number="8">8</button>
+            <button data-number="9">9</button>
+            <button class="operator" data-action="-">-</button>
+            
+            <button data-number="4">4</button>
+            <button data-number="5">5</button>
+            <button data-number="6">6</button>
+            <button class="operator" data-action="+">+</button>
+            
+            <button data-number="1">1</button>
+            <button data-number="2">2</button>
+            <button data-number="3">3</button>
+            <button data-action=".">.</button>
+            
+            <button class="zero" data-number="0">0</button>
+            <button data-action="=">=</button>
+        </div>
+    </div>
+
+    <script>
+        class Calculator {
+            constructor() {
+                this.previousOperandElement = document.querySelector('.previous-operand');
+                this.currentOperandElement = document.querySelector('.current-operand');
+                this.clear();
+                this.setupEventListeners();
+                
+                // Оптимизация для мгновенного отклика
+                this.preventTouchDelay();
+            }
+            
+            preventTouchDelay() {
+                // Убираем задержку на touch устройствах
+                document.addEventListener('touchstart', function() {}, {passive: true});
+            }
+            
+            clear() {
+                this.currentOperand = '0';
+                this.previousOperand = '';
+                this.operation = undefined;
+                this.shouldResetScreen = false;
+            }
+            
+            delete() {
+                this.currentOperand = this.currentOperand.toString().slice(0, -1);
+                if (this.currentOperand === '' || this.currentOperand === '-') {
+                    this.currentOperand = '0';
+                }
+            }
+            
+            appendNumber(number) {
+                if (this.shouldResetScreen) {
+                    this.currentOperand = '';
+                    this.shouldResetScreen = false;
+                }
+                
+                if (number === '.' && this.currentOperand.includes('.')) return;
+                
+                // Бесконечный ввод - убраны все ограничения
+                if (this.currentOperand === '0' && number !== '.') {
+                    this.currentOperand = number;
+                } else {
+                    this.currentOperand += number;
+                }
+            }
+            
+            chooseOperation(operation) {
+                if (this.currentOperand === '0' && this.previousOperand === '') return;
+                
+                if (this.previousOperand !== '') {
+                    this.compute();
+                }
+                
+                this.operation = operation;
+                this.previousOperand = this.currentOperand;
+                this.currentOperand = '0';
+            }
+            
+            compute() {
+                let computation;
+                const prev = parseFloat(this.previousOperand);
+                const current = parseFloat(this.currentOperand);
+                
+                if (isNaN(prev) || isNaN(current)) return;
+                
+                switch (this.operation) {
+                    case '+':
+                        computation = prev + current;
+                        break;
+                    case '-':
+                        computation = prev - current;
+                        break;
+                    case '×':
+                        computation = prev * current;
+                        break;
+                    case '÷':
+                        computation = current === 0 ? 'Ошибка' : prev / current;
+                        break;
+                    default:
+                        return;
+                }
+                
+                this.currentOperand = computation.toString();
+                this.operation = undefined;
+                this.previousOperand = '';
+                this.shouldResetScreen = true;
+            }
+            
+            updateDisplay() {
+                // Бесконечный ввод - просто отображаем как есть
+                this.currentOperandElement.textContent = this.formatNumber(this.currentOperand);
+                
+                if (this.operation != null) {
+                    this.previousOperandElement.textContent = 
+                        `${this.formatNumber(this.previousOperand)} ${this.operation}`;
+                } else {
+                    this.previousOperandElement.textContent = '';
+                }
+            }
+            
+            formatNumber(number) {
+                // Просто возвращаем число как строку без ограничений
+                return number.toString();
+            }
+            
+            setupEventListeners() {
+                // Мгновенный отклик на клики
+                const handleClick = (button, action) => {
+                    button.style.transform = 'scale(0.98)';
+                    button.style.background = 'rgba(255, 255, 255, 0.2)';
+                    
+                    setTimeout(() => {
+                        button.style.transform = '';
+                        button.style.background = '';
+                    }, 100);
+                    
+                    if (action === 'number') {
+                        this.appendNumber(button.getAttribute('data-number'));
+                    } else if (action === 'clear') {
+                        this.clear();
+                    } else if (action === 'backspace') {
+                        this.delete();
+                    } else if (action === 'equals') {
+                        this.compute();
+                    } else if (action === 'decimal') {
+                        this.appendNumber('.');
+                    } else {
+                        this.chooseOperation(action);
+                    }
+                    
+                    this.updateDisplay();
+                };
+                
+                // Цифры
+                document.querySelectorAll('[data-number]').forEach(button => {
+                    button.addEventListener('click', () => handleClick(button, 'number'));
+                    button.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        handleClick(button, 'number');
+                    }, {passive: false});
+                });
+                
+                // Действия
+                document.querySelectorAll('[data-action]').forEach(button => {
+                    const action = button.getAttribute('data-action');
+                    
+                    button.addEventListener('click', () => {
+                        if (action === 'clear') {
+                            handleClick(button, 'clear');
+                        } else if (action === 'backspace') {
+                            handleClick(button, 'backspace');
+                        } else if (action === '=') {
+                            handleClick(button, 'equals');
+                        } else if (action === '.') {
+                            handleClick(button, 'decimal');
+                        } else {
+                            handleClick(button, action);
+                        }
+                    });
+                    
+                    button.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        if (action === 'clear') {
+                            handleClick(button, 'clear');
+                        } else if (action === 'backspace') {
+                            handleClick(button, 'backspace');
+                        } else if (action === '=') {
+                            handleClick(button, 'equals');
+                        } else if (action === '.') {
+                            handleClick(button, 'decimal');
+                        } else {
+                            handleClick(button, action);
+                        }
+                    }, {passive: false});
+                });
+                
+                // Клавиатура - мгновенный отклик
+                document.addEventListener('keydown', (e) => {
+                    e.preventDefault();
+                    
+                    if (/[0-9]/.test(e.key)) {
+                        this.appendNumber(e.key);
+                    } else if (e.key === '.') {
+                        this.appendNumber('.');
+                    } else if (e.key === '+' || e.key === '-' || e.key === '*' || e.key === '/') {
+                        let operation;
+                        switch (e.key) {
+                            case '*': operation = '×'; break;
+                            case '/': operation = '÷'; break;
+                            default: operation = e.key;
+                        }
+                        this.chooseOperation(operation);
+                    } else if (e.key === 'Enter' || e.key === '=') {
+                        this.compute();
+                    } else if (e.key === 'Backspace') {
+                        this.delete();
+                    } else if (e.key === 'Escape') {
+                        this.clear();
+                    }
+                    
+                    this.updateDisplay();
+                });
+            }
+        }
+
+        // Инициализация с максимальной производительностью
+        const calculator = new Calculator();
+        
+        // Дополнительная оптимизация
+        window.addEventListener('load', () => {
+            document.body.style.visibility = 'visible';
+        });
+    </script>
+</body>
+</html>
